@@ -1,0 +1,194 @@
+// DOM Elements
+// Gán cứng Client ID theo yêu cầu
+const CLIENT_ID = '397456705277-snngf473ovck1nisb06uq21pqu96655p.apps.googleusercontent.com';
+// Gán cứng ID Thư mục theo yêu cầu
+const FOLDER_ID = '18ted6k0Xa3lebJ2ob_wCXrDqRi6s5CVB';
+const authBtn = document.getElementById('authBtn');
+const searchInput = document.getElementById('searchInput');
+const imageList = document.getElementById('imageList');
+const loader = document.getElementById('loader');
+const errorMessage = document.getElementById('errorMessage');
+const emptyState = document.getElementById('emptyState');
+
+// Biến lưu trữ dữ liệu
+let allImages = [];
+let tokenClient;
+let accessToken = null;
+
+// Khởi tạo và yêu cầu Token khi bấm Đăng nhập
+authBtn.addEventListener('click', () => {
+
+    try {
+        // Khởi tạo OAuth 2.0 client
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/drive.readonly',
+            callback: (tokenResponse) => {
+                if (tokenResponse.error !== undefined) {
+                    throw (tokenResponse);
+                }
+                // Lưu token
+                accessToken = tokenResponse.access_token;
+                // Có token rồi thì gọi hàm lấy dữ liệu
+                fetchImages(accessToken, FOLDER_ID);
+            },
+        });
+
+        // Kích hoạt cửa sổ đăng nhập
+        tokenClient.requestAccessToken();
+    } catch (error) {
+        showError('Lỗi khi khởi tạo đăng nhập Google. Kiểm tra lại Client ID.');
+        console.error(error);
+    }
+});
+
+// Lắng nghe sự kiện tìm kiếm
+searchInput.addEventListener('input', (e) => {
+    const searchTerm = e.target.value.toLowerCase();
+    const filteredImages = allImages.filter(img =>
+        img.name.toLowerCase().includes(searchTerm)
+    );
+    renderImages(filteredImages);
+});
+
+// Hàm gọi API Google Drive đệ quy (hỗ trợ đọc thư mục con)
+async function fetchImages(token, rootFolderId) {
+    // Reset UI
+    hideError();
+    emptyState.classList.add('hidden');
+    imageList.innerHTML = '';
+    loader.classList.remove('hidden');
+    searchInput.disabled = true;
+    allImages = [];
+
+    try {
+        let foldersToProcess = [rootFolderId];
+        let imageFiles = [];
+
+        // Vòng lặp duyệt qua các thư mục (Breadth-First Search)
+        while (foldersToProcess.length > 0) {
+            let currentFolderId = foldersToProcess.shift();
+            let pageToken = null;
+
+            do {
+                const query = `'${currentFolderId}' in parents and trashed = false`;
+                const fields = 'nextPageToken,files(id,name,mimeType,thumbnailLink,webContentLink)';
+                let url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&pageSize=1000`;
+
+                if (pageToken) {
+                    url += `&pageToken=${pageToken}`;
+                }
+
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || 'Lỗi khi kết nối với Google Drive API');
+                }
+
+                const data = await response.json();
+
+                if (data.files) {
+                    for (let file of data.files) {
+                        if (file.mimeType === 'application/vnd.google-apps.folder') {
+                            // Nếu là thư mục con, đưa vào hàng đợi để duyệt tiếp
+                            foldersToProcess.push(file.id);
+                        } else if (file.mimeType && file.mimeType.startsWith('image/')) {
+                            // Nếu là hình ảnh, đưa vào mảng kết quả
+                            imageFiles.push(file);
+                        }
+                    }
+                }
+                pageToken = data.nextPageToken;
+            } while (pageToken);
+        }
+
+        if (imageFiles.length > 0) {
+            allImages = imageFiles.map(file => {
+                let imgUrl = file.thumbnailLink;
+                if (imgUrl) {
+                    imgUrl = imgUrl.replace('=s220', '=s800'); // Tăng kích thước ảnh hiển thị
+                }
+                return {
+                    id: file.id,
+                    name: file.name,
+                    url: imgUrl || file.webContentLink
+                };
+            });
+
+            renderImages(allImages);
+            searchInput.disabled = false;
+            searchInput.value = ''; // Reset thanh tìm kiếm
+        } else {
+            showEmptyState();
+        }
+    } catch (error) {
+        showError(`Đã xảy ra lỗi: ${error.message}`);
+        if (error.message.includes('Insufficient Permission') || error.message.includes('unauthenticated')) {
+            showError('Lỗi phân quyền: Đảm bảo bạn đăng nhập bằng email công ty có quyền vào thư mục này.');
+        }
+    } finally {
+        loader.classList.add('hidden');
+    }
+}
+
+// Hàm hiển thị danh sách hình ảnh
+function renderImages(images) {
+    imageList.innerHTML = '';
+
+    if (images.length === 0) {
+        showEmptyState();
+        return;
+    }
+
+    emptyState.classList.add('hidden');
+
+    images.forEach((img, index) => {
+        const li = document.createElement('li');
+        li.className = 'list-item';
+        li.style.animationDelay = `${index * 0.05}s`;
+
+        const imgContainer = document.createElement('div');
+        imgContainer.className = 'col-image item-image';
+
+        const imageElement = document.createElement('img');
+
+        // Cố gắng sử dụng thumbnailLink.
+        // Google Drive thumbnail API thường tự xử lý xác thực qua cookie của trình duyệt nếu đã đăng nhập,
+        // hoặc link thumbnail là link công khai tạm thời.
+        imageElement.src = img.url || 'https://via.placeholder.com/150?text=No+Image';
+        imageElement.alt = img.name;
+        imageElement.loading = 'lazy';
+
+        imageElement.onerror = function () {
+            this.src = 'https://via.placeholder.com/150?text=Private+Image';
+        };
+
+        const nameContainer = document.createElement('div');
+        nameContainer.className = 'col-name item-name';
+        nameContainer.textContent = img.name;
+
+        imgContainer.appendChild(imageElement);
+        li.appendChild(imgContainer);
+        li.appendChild(nameContainer);
+
+        imageList.appendChild(li);
+    });
+}
+
+function showError(message) {
+    errorMessage.textContent = message;
+    errorMessage.classList.remove('hidden');
+}
+
+function hideError() {
+    errorMessage.classList.add('hidden');
+}
+
+function showEmptyState() {
+    emptyState.classList.remove('hidden');
+}

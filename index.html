@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xử lý hàng rơi rớt | Drive Gallery</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Identity Services OAuth 2.0 -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+
+<body>
+    <!-- Floating Ambient Orbs - Hiệu ứng nền bay bổng -->
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-orb orb-3"></div>
+
+    <!-- User Profile Bar (Hiển thị tên Gmail + Nút Đăng xuất ở góc trên phải màn hình) -->
+    <div id="userProfileBar" class="user-profile-bar hidden">
+        <div class="user-info">
+            <div class="user-avatar-wrap">
+                <img id="userAvatar" class="user-avatar hidden" src="" alt="Avatar">
+                <div id="userDefaultAvatar" class="user-default-avatar">
+                    <i class="ph-bold ph-user"></i>
+                </div>
+                <span class="user-online-dot"></span>
+            </div>
+            <div class="user-details">
+                <span id="userName" class="user-name">Người dùng</span>
+                <span id="userEmail" class="user-email">email@gmail.com</span>
+            </div>
+        </div>
+        <button id="logoutBtn" class="logout-btn" title="Đăng xuất khỏi hệ thống">
+            <i class="ph-bold ph-sign-out"></i>
+            <span>Đăng xuất</span>
+        </button>
+    </div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="header-badge">
+                <span class="badge-dot"></span>
+                <span>[BD A Mega SOC] Xử lý hàng rơi rớt</span>
+            </div>
+            <h1>
+                <div class="logo-icon-wrapper">
+                    <i class="ph-bold ph-google-drive-logo"></i>
+                </div>
+                <span class="header-title-text">SPX Express</span>
+            </h1>
+            <p class="subtitle">Tra cứu và xử lý hình ảnh hàng rơi rớt nhanh chóng, sắc nét</p>
+        </header>
+
+        <!-- Config / Login Panel -->
+        <section class="config-panel" id="configPanel">
+            <div class="config-header">
+                <div class="config-title">
+                    <i class="ph-fill ph-shield-check"></i>
+                    <h2>Xác thực tài khoản</h2>
+                </div>
+                <span id="authStatus" class="status-badge status-offline">Chưa kết nối</span>
+            </div>
+
+            <div class="input-group">
+                <button id="authBtn" class="primary-btn">
+                    <i class="ph-bold ph-google-logo"></i>
+                    <span>Đăng nhập bằng Google</span>
+                </button>
+                <!-- <button id="demoBtn" class="secondary-pill-btn" title="Xem trước giao diện với dữ liệu mẫu">
+                    <i class="ph-bold ph-sparkle"></i>
+                    <span>Xem giao diện mẫu</span>
+                </button> -->
+            </div>
+
+            <div class="hint">
+                <i class="ph-fill ph-info"></i>
+                <span>Nhớ đăng nhập bằng <strong>Email công ty</strong> để được cấp quyền truy cập thư mục nhé!</span>
+            </div>
+        </section>
+
+        <!-- Gallery Section -->
+        <section class="gallery-section">
+            <div class="toolbar">
+                <div class="search-bar">
+                    <i class="ph-bold ph-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Tìm kiếm theo mã đơn, tên file..." disabled>
+                    <button id="clearSearchBtn" class="clear-search-btn hidden" title="Xóa tìm kiếm">
+                        <i class="ph-bold ph-x"></i>
+                    </button>
+                </div>
+
+                <div class="toolbar-actions">
+                    <span id="itemCount" class="count-badge hidden">
+                        <i class="ph-fill ph-images"></i>
+                        <span id="itemCountText">0 hình ảnh</span>
+                    </span>
+                    <div class="view-toggle" id="viewToggle" title="Chuyển chế độ hiển thị">
+                        <button id="btnListView" class="toggle-btn active" title="Dạng danh sách">
+                            <i class="ph-bold ph-list-dashes"></i>
+                        </button>
+                        <button id="btnGridView" class="toggle-btn" title="Dạng lưới thẻ">
+                            <i class="ph-bold ph-squares-four"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loader -->
+            <div id="loader" class="loader hidden">
+                <div class="loader-spinner">
+                    <div class="spinner-ring"></div>
+                    <i class="ph-bold ph-lightning"></i>
+                </div>
+                <div class="loader-text">
+                    <span class="loader-title">Đang đồng bộ dữ liệu...</span>
+                    <span class="loader-subtitle">Đang quét các thư mục từ Google Drive</span>
+                </div>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="error-message hidden">
+                <i class="ph-bold ph-warning-circle"></i>
+                <div id="errorText" class="error-text"></div>
+            </div>
+
+            <!-- List Container -->
+            <div class="list-container">
+                <div class="list-header" id="listHeader">
+                    <div class="col-image">Hình Ảnh</div>
+                    <div class="col-name">Tên File & Chi Tiết</div>
+                    <div class="col-actions">Thao Tác</div>
+                </div>
+
+                <ul id="imageList" class="image-list">
+                    <!-- Các mục hình ảnh được tạo và chèn tự động bởi JavaScript -->
+                </ul>
+
+                <div id="emptyState" class="empty-state hidden">
+                    <div class="empty-icon-box">
+                        <i class="ph-bold ph-image-broken"></i>
+                    </div>
+                    <h3>Không tìm thấy hình ảnh nào</h3>
+                    <p id="emptyStateDesc">Vui lòng đăng nhập hoặc nhập từ khóa tìm kiếm khác.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-content">
+                <p class="subtitle1">
+                    <span class="pulse-indicator"></span>
+                    Hệ thống quản lý nội bộ • Developer by <strong>Thái Dân</strong>
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Image Lightbox Modal -->
+    <div id="imageModal" class="image-modal hidden">
+        <div class="modal-backdrop" id="modalBackdrop"></div>
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-box">
+                    <i class="ph-fill ph-file-image"></i>
+                    <h3 id="modalFileName">Chi tiết hình ảnh</h3>
+                </div>
+                <button id="closeModalBtn" class="modal-close-btn" title="Đóng (Esc)">
+                    <i class="ph-bold ph-x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-image-wrapper">
+                    <img id="modalImage" src="" alt="Xem trước chi tiết">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="modalCopyBtn" class="modal-action-btn secondary">
+                    <i class="ph-bold ph-copy"></i>
+                    <span>Sao chép tên file</span>
+                </button>
+                <a id="modalOpenBtn" href="#" target="_blank" rel="noopener noreferrer"
+                    class="modal-action-btn primary">
+                    <i class="ph-bold ph-arrow-square-out"></i>
+                    <span>Mở ảnh gốc</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+        <i class="ph-fill ph-check-circle"></i>
+        <span id="toastMsg">Đã sao chép!</span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
